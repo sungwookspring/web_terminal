@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+    <link rel="stylesheet" href="node_modules/xterm/css/xterm.css" />
+    <script src="node_modules/xterm/lib/xterm.js"></script>
+</head>
+<body>
+<div id="terminal"></div>
+
+<script>
+    var url = "ws://127.0.0.1:8080/sock"
+    var shellprompt = "";
+    var cmd = '';
+
+    var term = new Terminal();
+    term.open(document.getElementById('terminal'),false);
+    term.prompt = function () {
+      term.write('\r\n' + shellprompt);
+    };
+
+    term.writeln('Welcome to CKA');
+    term.writeln('');
+    // term.prompt();
+    term.setOption('cursorBlink', true);
+
+    var websocket = new WebSocket(url);
+    websocket.onopen = function(e) {
+      
+    }
+    websocket.onmessage = function(e) {
+      console.log(e.data);
+      // 프롬프트인지 검출 정규식
+      var prompt_regex = /<prompt_start>.*<prompt_end>/;
+      // 쉘 프롬프트 변경
+      if(prompt_regex.exec(e.data)){
+        shellprompt = e.data.replace("<prompt_start>", "").replace("<prompt_end>", "");
+        return;
+      }
+      
+      if(e.data == shellprompt){
+        return;
+      }else{
+        term.writeln(e.data);
+        term.prompt();
+      }
+      
+    }
+    websocket.onerror = function(e){
+      alert("error");
+    }    
+
+    term.onKey(function (key){
+      var printable = (!key.altKey && !key.altGraphKey && !key.ctrlKey && !key.metaKey);
+      key_code = key.domEvent.keyCode;
+      input_key = key.domEvent.key;
+
+      // key is Enter
+      if(key_code == 13){
+        if( cmd === 'clear'){
+          term.clear();
+          cmd = '';
+          term.prompt();
+        }        
+        else{ // 백엔드 전송
+          if(cmd.length == 0){
+            term.prompt();
+          }else{
+            term.writeln("");
+            websocket.send(cmd);
+            cmd = '';
+          }
+          
+        }
+      }else if(key_code == 8){ // key is backspace
+        term.write('\b \b');
+        cmd = cmd.slice(0, -1);
+      }else if(printable){
+        cmd += key.key;
+        term.write(key.key);
+      }
+    });
+
+
+
+</script>
+</body>
+</html>
